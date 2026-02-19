@@ -16,9 +16,11 @@ FastAPI service that exposes company and profile scrapers as HTTP endpoints.
 
 ### POST /company
 
+Search by company handle (e.g. `tutorflo`, `microsoft`) or full URL. No directory required.
+
 ```json
 {
-  "companies": ["Microsoft", "OpenAI", "Google"]
+  "companies": ["tutorflo", "microsoft", "openai"]
 }
 ```
 

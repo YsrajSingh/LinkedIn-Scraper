@@ -45,8 +45,16 @@ async def run_company_scraper(companies: list[str]) -> list[dict]:
                 raise RuntimeError(f"Scraper failed: {stderr.decode()}")
             return []
         with open(output_path) as f:
-            data = json.load(f)
+            content = f.read()
+        if not content.strip():
+            return []
+        data = json.loads(content)
         return data if isinstance(data, list) else [data]
+    except json.JSONDecodeError as e:
+        # Empty or invalid JSON (e.g. no items found)
+        return []
+    except RuntimeError:
+        raise
     except Exception as e:
         raise RuntimeError(f"Company scraper failed: {e}") from e
     finally:
@@ -77,12 +85,21 @@ async def run_profile_scraper(profiles: list[str]) -> list[dict]:
             stderr=asyncio.subprocess.PIPE,
         )
         _, stderr = await proc.communicate()
-        if proc.returncode != 0 and os.path.exists(output_path):
-            pass
-        if os.path.exists(output_path):
-            with open(output_path) as f:
-                data = json.load(f)
-            return data if isinstance(data, list) else [data]
+        if not os.path.exists(output_path):
+            if proc.returncode != 0 and stderr:
+                raise RuntimeError(f"Scraper failed: {stderr.decode()}")
+            return []
+        with open(output_path) as f:
+            content = f.read()
+        if not content.strip():
+            return []
+        data = json.loads(content)
+        return data if isinstance(data, list) else [data]
+    except json.JSONDecodeError:
+        # Empty or invalid JSON (e.g. no items found / all blocked)
+        return []
+    except RuntimeError:
+        raise
     except Exception as e:
         raise RuntimeError(f"Profile scraper failed: {e}") from e
     finally:

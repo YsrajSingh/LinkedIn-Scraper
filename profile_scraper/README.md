@@ -1,6 +1,6 @@
 # LinkedIn User Profile Scraper
 
-Scrapes public LinkedIn user profile data.
+Scrapes public LinkedIn user profile data by handle or URL. Uses the same config pattern as the company scraper (User-Agent, sequential requests, delay).
 
 ## Setup
 

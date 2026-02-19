@@ -1,28 +1,21 @@
-import json
-import os
 import re
 import scrapy
 
 
-INPUT_FILE = "directorydata.json"
-DEFAULT_COMPANIES = ["OpenAI", "Microsoft"]
+DEFAULT_COMPANIES = ["openai", "microsoft"]
 
 
-def get_urls_by_company_names(company_names: list[str], directory_path: str) -> list[str]:
-    """Look up company URLs from directorydata.json. Returns unique URLs."""
-    company_urls = []
-    input_path = os.path.join(directory_path, INPUT_FILE)
-    try:
-        with open(input_path, "r") as f:
-            data = json.load(f)
-        for name in company_names:
-            for company_data in data:
-                if isinstance(company_data, dict) and name in company_data:
-                    company_urls.append(str(company_data[name]))
-                    break
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Directory data not found: {input_path}")
-    return list(set(company_urls))
+def normalize_company_url(handle_or_url: str) -> str:
+    """Convert company handle or full URL to LinkedIn company page URL."""
+    s = handle_or_url.strip().lower()
+    if s.startswith("http"):
+        return s
+    # Extract handle from partial URLs like "linkedin.com/company/microsoft"
+    if "linkedin.com/company/" in s:
+        handle = s.split("linkedin.com/company/")[-1].split("?")[0].strip("/")
+    else:
+        handle = s.replace("linkedin.com/company/", "").strip("/")
+    return f"https://www.linkedin.com/company/{handle}"
 
 
 class CompanyProfileScraperSpider(scrapy.Spider):
@@ -30,13 +23,12 @@ class CompanyProfileScraperSpider(scrapy.Spider):
 
     def __init__(self, companies: str = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        company_names = [c.strip() for c in (companies or "").split(",") if c.strip()]
-        if not company_names:
-            company_names = DEFAULT_COMPANIES
-        # Scrapy runs with cwd = project dir (company_data_scraper)
-        self.company_pages = get_urls_by_company_names(company_names, os.getcwd())
+        handles = [c.strip() for c in (companies or "").split(",") if c.strip()]
+        if not handles:
+            handles = DEFAULT_COMPANIES
+        self.company_pages = list({normalize_company_url(h) for h in handles})
         if not self.company_pages:
-            raise ValueError("No company URLs found. Check names and directorydata.json.")
+            raise ValueError("No company handles provided. Use -a companies=handle1,handle2")
 
     def start_requests(self):
         company_index_tracker = 0
@@ -54,12 +46,16 @@ class CompanyProfileScraperSpider(scrapy.Spider):
 
         company_item = {}
 
-        company_item['company_name'] = response.css('.top-card-layout__entity-info h1::text').get(
-            default='not-found').strip()
+        company_item['company_name'] = (response.css('.top-card-layout__entity-info h1::text').get(
+            default='not-found') or 'not-found').strip()
 
-        company_item['linkedin_followers_count'] = int(response.xpath(
-            '//h3[contains(@class, "top-card-layout__first-subline")]/span/following-sibling::text()').get().split()[
-            0].strip().replace(',', ''))
+        followers_text = response.xpath(
+            '//h3[contains(@class, "top-card-layout__first-subline")]/span/following-sibling::text()').get()
+        try:
+            company_item['linkedin_followers_count'] = int(
+                (followers_text or '').split()[0].strip().replace(',', ''))
+        except (ValueError, IndexError, AttributeError):
+            company_item['linkedin_followers_count'] = 0
         # attr(src) didn't work, I saw the img element response and found out `src` has changed to `data-delayed-url` for which there was logo link.
         company_item['company_logo_url'] = response.css(
             'div.top-card-layout__entity-image-container img::attr(data-delayed-url)').get('not-found')
@@ -126,9 +122,12 @@ class CompanyProfileScraperSpider(scrapy.Spider):
             # funding parameters, more feasible error handling to be implemented, if sir needs to have..
             company_item['funding'] = response.css(
                 'p.text-display-lg::text').get(default='not-found').strip()
-            company_item['funding_total_rounds'] = int(response.xpath(
-                '//section[contains(@class, "aside-section-container")]/div/a[contains(@class, "link-styled")]//span[contains(@class, "before:middot")]/text()').get(
-                'not-found').strip().split()[0])
+            funding_rounds_raw = response.xpath(
+                '//section[contains(@class, "aside-section-container")]/div/a[contains(@class, "link-styled")]//span[contains(@class, "before:middot")]/text()').get() or ''
+            try:
+                company_item['funding_total_rounds'] = int(str(funding_rounds_raw).strip().split()[0].replace(',', ''))
+            except (ValueError, IndexError, AttributeError):
+                company_item['funding_total_rounds'] = 0
             company_item['funding_option'] = response.xpath(
                 '//section[contains(@class, "aside-section-container")]/div//div[contains(@class, "my-2")]/a[contains(@class, "link-styled")]/text()').get(
                 'not-found').strip()

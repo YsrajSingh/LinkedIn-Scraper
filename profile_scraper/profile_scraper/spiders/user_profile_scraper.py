@@ -1,14 +1,11 @@
 """
 LinkedIn User Profile Scraper
 
-Scrapes public LinkedIn user profile data. Add profile URLs or usernames to
-desired_profiles below, then run:
-    scrapy crawl user_profile_scraper -O user_profiles.json
+Scrapes public LinkedIn user profile data. Same config/pattern as company scraper.
 """
 
 import re
 import scrapy
-
 
 DEFAULT_PROFILES = ["satya-nadella", "reidhoffman"]
 
@@ -18,7 +15,6 @@ def normalize_profile_url(profile_input: str) -> str:
     profile_input = profile_input.strip()
     if profile_input.startswith("http"):
         return profile_input
-    # Remove leading/trailing slashes and linkedin.com prefix if partial
     username = profile_input.replace("linkedin.com/in/", "").strip("/")
     return f"https://www.linkedin.com/in/{username}"
 
@@ -36,12 +32,13 @@ class UserProfileScraperSpider(scrapy.Spider):
             raise ValueError("No profile URLs to scrape. Add usernames via -a profiles=user1,user2")
 
     def start_requests(self):
-        for i, url in enumerate(self.profile_urls):
-            yield scrapy.Request(
-                url=url,
-                callback=self.parse_profile,
-                meta={"profile_index": i},
-            )
+        # Sequential requests - identical pattern to company scraper
+        first_url = self.profile_urls[0]
+        yield scrapy.Request(
+            url=first_url,
+            callback=self.parse_profile,
+            meta={"profile_index": 0},
+        )
 
     def parse_profile(self, response):
         profile_index = response.meta["profile_index"]
@@ -131,3 +128,13 @@ class UserProfileScraperSpider(scrapy.Spider):
             item["current_role"] = "not-found"
 
         yield item
+
+        # Chain to next profile (sequential like company scraper)
+        profile_index += 1
+        if profile_index < len(self.profile_urls):
+            next_url = self.profile_urls[profile_index]
+            yield scrapy.Request(
+                url=next_url,
+                callback=self.parse_profile,
+                meta={"profile_index": profile_index},
+            )

@@ -61,11 +61,11 @@ Then open http://localhost:8000/docs for interactive API documentation.
 | POST | `/company` | Search multiple companies |
 | POST | `/profile` | Search multiple profiles |
 
-**Example - Search companies:**
+**Example - Search companies (by handle or URL):**
 ```bash
 curl -X POST http://localhost:8000/company \
   -H "Content-Type: application/json" \
-  -d '{"companies": ["Microsoft", "OpenAI", "Google"]}'
+  -d '{"companies": ["microsoft", "tutorflo", "openai"]}'
 ```
 
 **Example - Search profiles:**
@@ -74,6 +74,7 @@ curl -X POST http://localhost:8000/profile \
   -H "Content-Type: application/json" \
   -d '{"profiles": ["satya-nadella", "reidhoffman"]}'
 ```
+*Profile scraping uses the same setup as company scraping. Success may vary by network; try a different connection if requests fail.*
 
 ## 4. CLI Usage (Scrapers)
 
@@ -92,24 +93,11 @@ The scraped company directory data will be stored in the `directory_data.json` f
 
 ### LinkedIn Company Profile Scraper
 
-To Populate the list of companies you want to get information about, it's important to understand that the `company_profile_scraper.py` is supposed to take list of company names, through which it grabs the respective linkedin urls from the `directorydata.json` that scrapes the specific urls.
-
-Go to `company_profile_scraper.py` and add your list of companies in the given `desired_company_names` list. You can add as many as you like!
-
-```python
-desired_company_names = ["Microsoft", "OpenAI"] # Please make sure to check the spellings of the names given
-```
-
-Run the LinkedIn Company Profile Scraper using the following command:
+Scrapes company data directly from LinkedIn using company handles (e.g. `microsoft`, `tutorflo`) or full URLs. No directory file required.
 
 ```bash
-scrapy crawl company_profile_scraper -O company_profile_data.json
-```
-
-The scraped company profile data will be stored in the `company_profile_data.json` file in a structured JSON format. You can also pass companies via CLI:
-
-```bash
-scrapy crawl company_profile_scraper -a "companies=Microsoft,OpenAI,Google" -O company_profile_data.json
+cd company_data_scraper
+scrapy crawl company_profile_scraper -a "companies=microsoft,tutorflo,openai" -O company_profile_data.json
 ```
 
 ### LinkedIn User Profile Scraper
