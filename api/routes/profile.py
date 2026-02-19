@@ -17,6 +17,14 @@ class ProfileRequest(BaseModel):
         min_length=1,
         max_length=50,
     )
+    li_at: str | None = Field(
+        default=None,
+        description=(
+            "LinkedIn session cookie (li_at) for authenticated scraping. "
+            "Without it, falls back to search-engine results (limited fields). "
+            "Get it from browser DevTools > Application > Cookies > linkedin.com > li_at"
+        ),
+    )
 
 
 class ProfileResponse(BaseModel):
@@ -30,9 +38,12 @@ async def search_profiles(request: ProfileRequest):
     """
     Search for multiple LinkedIn profiles. Accepts usernames (e.g. satya-nadella)
     or full profile URLs.
+
+    For best results, provide your LinkedIn li_at cookie for authenticated access.
+    Without it, the scraper falls back to search-engine results with limited data.
     """
     try:
-        data = await run_profile_scraper(request.profiles)
+        data = await run_profile_scraper(request.profiles, li_at=request.li_at)
         return ProfileResponse(success=True, count=len(data), data=data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
